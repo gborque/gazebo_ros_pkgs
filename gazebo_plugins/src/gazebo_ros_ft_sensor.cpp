@@ -93,6 +93,14 @@ void GazeboRosFT::Load( physics::ModelPtr _model, sdf::ElementPtr _sdf )
   else
     this->topic_name_ = _sdf->GetElement("topicName")->Get<std::string>();
   
+  if (!_sdf->HasElement("gaussianNoise"))
+  {
+    ROS_INFO("imu plugin missing <gaussianNoise>, defaults to 0.0");
+    this->gaussian_noise_ = 0.0;
+  }
+  else
+    this->gaussian_noise_ = _sdf->Get<double>("gaussianNoise");
+  
   if (!_sdf->HasElement("updateRate"))
   {
     ROS_DEBUG("ft_sensor plugin missing <updateRate>, defaults to 0.0"
@@ -182,18 +190,42 @@ void GazeboRosFT::UpdateChild()
   this->wrench_msg_.header.stamp.sec = (this->world_->GetSimTime()).sec;
   this->wrench_msg_.header.stamp.nsec = (this->world_->GetSimTime()).nsec;
 
-  this->wrench_msg_.wrench.force.x    = force.x;
-  this->wrench_msg_.wrench.force.y    = force.y;
-  this->wrench_msg_.wrench.force.z    = force.z;
-  this->wrench_msg_.wrench.torque.x   = torque.x;
-  this->wrench_msg_.wrench.torque.y   = torque.y;
-  this->wrench_msg_.wrench.torque.z   = torque.z;
+  this->wrench_msg_.wrench.force.x    = force.x + this->GaussianKernel(0, this->gaussian_noise_);
+  this->wrench_msg_.wrench.force.y    = force.y + this->GaussianKernel(0, this->gaussian_noise_);
+  this->wrench_msg_.wrench.force.z    = force.z + this->GaussianKernel(0, this->gaussian_noise_);
+  this->wrench_msg_.wrench.torque.x   = torque.x + this->GaussianKernel(0, this->gaussian_noise_);
+  this->wrench_msg_.wrench.torque.y   = torque.y + this->GaussianKernel(0, this->gaussian_noise_);
+  this->wrench_msg_.wrench.torque.z   = torque.z + this->GaussianKernel(0, this->gaussian_noise_);
 
   this->pub_.publish(this->wrench_msg_);
   this->lock_.unlock();
   
   // save last time stamp
   this->last_time_ = cur_time;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Utility for adding noise
+double GazeboRosFT::GaussianKernel(double mu, double sigma)
+{
+  // using Box-Muller transform to generate two independent standard
+  // normally disbributed normal variables see wikipedia
+
+  // normalized uniform random variable
+  double U = static_cast<double>(rand_r(&this->seed)) /
+             static_cast<double>(RAND_MAX);
+
+  // normalized uniform random variable
+  double V = static_cast<double>(rand_r(&this->seed)) /
+             static_cast<double>(RAND_MAX);
+
+  double X = sqrt(-2.0 * ::log(U)) * cos(2.0*M_PI * V);
+  // double Y = sqrt(-2.0 * ::log(U)) * sin(2.0*M_PI * V);
+
+  // there are 2 indep. vars, we'll just use X
+  // scale to our mu and sigma
+  X = sigma * X + mu;
+  return X;
 }
 
 // Custom Callback Queue

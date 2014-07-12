@@ -91,6 +91,12 @@ class GazeboRosFT : public ModelPlugin
 
   /// \brief Update the controller
   protected: virtual void UpdateChild();
+  
+  /// \brief Gaussian noise
+  private: double gaussian_noise_;
+  private: unsigned int seed;
+  /// \brief Gaussian noise generator
+  private: double GaussianKernel(double mu, double sigma);
 
   /// \brief A pointer to the Gazebo joint
   private: physics::JointPtr joint_;
