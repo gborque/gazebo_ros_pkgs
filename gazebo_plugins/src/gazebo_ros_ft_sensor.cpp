@@ -36,6 +36,7 @@ GZ_REGISTER_MODEL_PLUGIN(GazeboRosFT);
 GazeboRosFT::GazeboRosFT()
 {
   this->ft_connect_count_ = 0;
+  this->seed = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
